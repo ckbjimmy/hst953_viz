@@ -1,0 +1,405 @@
+---
+title: "Workshop - Data Visualization"
+subtitle: "HST.953 Collaborative Data Science in Medicine"
+author: "Wei-Hung Weng"
+date: "September 14, 2018"
+output: 
+  html_document: 
+    fig_height: 8
+    fig_width: 10
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd(getwd()) # Students will need to set their own path - replace `getwd()`
+```
+
+
+# Why Data Visualization?
+
+Visualization is an important means of understanding data; notably, effective visualizations can improve comprehension and often do so more quickly than other methods. As data has grown, particularly in the clinical domain, visualization has become increasingly important for the purposes of presentation and exploration. As a presentation tool, well-chosen visual representations can help engage readers and reduce the effort required to understand work. As such, there is often considerable effort that goes into selecting and creating appropriate visualizations that will be meaningful to the intended audience.
+
+As a tool for exploration, a few simple visualizations can go a long way toward understanding what your data "looks" like, what biases it may contain, and how best to proceed with exploratory analyses. Therefore, these visualizations are typically intended to be quick and easy. While they may lack the polish of more specific visualizations, they also appear frequently in presentation. In fact, they are often effective because their prevalence of use lends itself to a collective understanding of interpretation.
+
+In this workshop, we will explore the following topics:
+
+- Unsupervised visualizations: This includes histograms, scatterplots and boxplots  
+- Supervised visualizations: This includes model fitting and checking
+- Other considerations: How to use color, size, labels, etc.  
+
+Note that much of this content has been taken from the work of Dr. Jesse Raffa, Dr. Marzyeh Ghassemi, Dr. Tristan Naumann, and Dr. Jeffrey Heer, but data visualization for clinical purposes is not new. For example, Florence Nightingale drew coxcomb charts to demonstrate the impact of disease on troop mortality in 1858, and John Snow famously pinpointed the 1854 outbreak of cholera in London to a public water pump by mapping deaths in relation to pumps. 
+
+![Figure 1. Mortality coxcomb charts by Florence Nightingale ](http://www.florence-nightingale-avenging-angel.co.uk/blog/wp-content/uploads/2012/01/Rose.jpg)
+
+![Figure 2. London death map by John Snow ](https://www.wired.com/images_blogs/thisdayintech/2009/09/cholera.jpg)
+
+# Prerequisites
+
+Let's start by loading the dataset: the PhysioNet Challenge 2012 dataset and the MIMIC-III demo data (if you have it).
+
+PhysioNet Challenge 2012 is to develop methods for patient-specific prediction of in-hospital mortality. The raw data is available and can be downloaded from the [PhysioNet website](https://physionet.org/challenge/2012/). The dataset includes four thousands records from PhysioNet Challenge training set A. We thank Dr. Alistair Johnson's effort of complicated data preprocessing. To understand the details of dataset and attributes, please visit the above website and check the ``General descriptors'' and ``Time series'' sections. 
+
+Subsequently, this can be loaded into a dataframe called `data`:
+
+```{r}
+data <- read.csv("https://raw.githubusercontent.com/ckbjimmy/2018_mlw/master/data/PhysionetChallenge2012_data.csv")
+```
+
+For people who want to use MIMIC-III demo data, we can access it directly from `R` with `RPostgreSQL` package:
+
+```{r}
+# Create driver and connection, set the correct schema
+
+library("RPostgreSQL")
+# dbConnect can take arguments for dbname, host, port, user, password
+# Please enter your database information here to correctly direct to MIMIC-III demo data
+con <- dbConnect(dbDriver("PostgreSQL"), 
+                 dbname = "mimic",
+                 host = "127.0.0.1", 
+                 port = 5432,
+                 user ="mimic", 
+                 password = "")
+dbExecute(con, "SET search_path TO mimiciii") # you may want to change "mimiciii" to "mimiciii_demo"
+
+# Test connection
+dbExistsTable(con, "patients")
+dbGetQuery(con, "SELECT count(1) FROM patients")
+```
+
+This snippet makes several assumptions with respect to the way the database is set up.
+
+- `dbname`: It assumes the name of your database is the same as your local username (i.e., the result of `whoami`). If this is not the case, you should pass a different value indicating the name of your database (e.g., `dbname='mimic'`).
+- `host`: It assumes the database is hosted locally on your machine (i.e., on `localhost`).
+- `port`: It assumes Postgres is listening on the default port, `5432`.
+- `user`: It assumes the current user has access to the database.
+- `password`: It assumes no password is required for this user, usually because Postgres is using `peer` authentication.
+
+
+## Exercise 0:
+1. Inspect the PhysioNet dataset you have read in to the dataframe `data`.
+2. Connect to your local Postgres installation from `R` and run a query.
+
+********
+
+
+# Unsupervised Visualizations
+
+Unsupervised data visualization is a fundamentally exploratory process. We often 
+
+* construct graphics to address specific questions, 
+* inspect the ``answer'', 
+* assess new questions. 
+
+This can happen many times, especially if you want to demonstrate data variation. 
+
+## Common Data Transformations
+Another important thing to consider is the data you're working with - you may need to transform data appropriately to help with comparisons, or better approximate a normal distribution. Some common transforms that arise in practice are:
+
+Transform     | Operation        | Common Use
+---------     | ---------        | -----------
+Normalization | $\frac{x - mean(x)}{std(x)}$ | Convenience of zero-mean, unit variance.
+Reciprocal    | $\frac{1}{x}$          | Reversing order among values of same sign (i.e. largest becomes smallest).
+Log           | $log(x)$         | Reducing right skewedness.
+Cube Root     | $x^{1/3}$        | Reducing right skewedness. Can be applied to zero and negative values.
+Square        | $x^2$            | Reducing left skewedness.
+Box-Cox       | $\frac{x^\lambda - 1}{\lambda} , \lambda \neq 0$, $log(x) , \lambda = 0$ | Obtain a "normal" shape.
+
+While these are common statistical transforms, they are by no means exhaustive. Many transforms arise in the form of preprocessing. These can include binning (e.g., as a means of discretizing continuous data), and grouping (e.g., merging categorical values that share a single semantic meaning).
+
+*No exercise for this section.*
+
+********
+
+
+## Histogram
+
+The histogram characterizes the distribution of a variable by plotting the frequency that a numeric variable occurs within intervals called bins.  For example, we plot the duration of mechanical ventilation in the ICU (minutes) below as a histogram using the `hist` function.  `R` chooses it's bin size adaptively, but sometimes it doesn't make a good choice.  You can change the number of bins by specifying the `breaks` argument.  The `breaks` are related to the number of bins in the plot.  Increasing the `breaks` to 100, yields the second plot with.  It's also common to transform the data, and you can see below, for a long-tailed variable like length of stay, taking the log reduces the "tailedness" of the distribution.  `hist` and `R` plots in general are very customizable, and handle lots of additional arguments.  We have included a couple here.
+
+```{r}
+hist(data$MechVentDuration,
+     main="Duration of mechenical ventilation in ICU",
+     xlab="Duration of mechenical ventilation in ICU",
+     col="grey")
+
+hist(data$MechVentDuration,
+     main="Duration of mechenical ventilation in ICU",
+     xlab="Duration of mechenical ventilation in ICU",
+     col="grey",breaks=100)
+
+hist(log(data$MechVentDuration),
+     main="log(Duration of mechenical ventilation) in ICU",
+     xlab="log(Duration of mechenical ventilation) in ICU",
+     col="grey")
+```
+
+Let's also take a look at length of stay in the MIMIC-III demo data.
+
+```{r}
+demo.admissions <- dbReadTable(con, "admissions")
+demo.los <- as.numeric(demo.admissions$dischtime - demo.admissions$admittime)
+hist(demo.los,main="Length of Stay in ICU",
+     xlab="Length of Stay in ICU",
+     col="grey", 
+     breaks=50)
+```
+
+Already we'll notice that the scale is wildly different. In this case, it looks like that's because `demo.los` is actually in minutes. Let's go ahead and change that to the scale of days used previously.
+
+```{r}
+hist(demo.los/(60*24),
+     main="Length of Stay in ICU",
+     xlab="Length of Stay in ICU",
+     col="grey", 
+     breaks=50)
+```
+
+## Density Estimation
+
+A density esimate of a numeric variable is related to its histogram, as it also tries to characterize the distribution of the variable through computing its density.  Without going into too much technical detail, you can think of a density as a scaled version of a "continuous histogram".  We do this by using the `density` function in `R`.  Like, `summary`, `plot` is also a generic function that you can pass to many types of data strucutures, including a `density` object.  Consider the density estimates of the ICU length-of-stay shown below.  You will see similar to histograms, density estimates also have a parameter (`bw`).  This controls the smoothness of the estimate.  We vary it from 50 to 1, and you can see how it affects the estimate of the density.
+
+```{r}
+plot(density(data$MechVentDuration),
+     main="MV duration in ICU, bw=default",
+     xlab="MV duration in ICU",
+     ylab="Density Estimate")
+
+plot(density(data$MechVentDuration, bw=50),
+     main="MV duration in ICU, bw=2",
+     xlab="MV duration in ICU",
+     ylab="Density Estimate")
+
+plot(density(data$MechVentDuration, bw=1),
+     main="MV duration in ICU, bw=0.1",
+     xlab="MV duration in ICU",
+     ylab="Density Estimate")
+```
+
+
+## Exercise 1:
+1. Plot a histogram of Age (`Age`).  Include an appropriate axis label and title.  Make the histogram blue.
+2. Vary the number of bins, include in your report when the number of bins are 3 and 30.
+3. Explain in your own words why the histograms in 2 look the way they do, and discuss if `R` did a good job in picking the number of bins.
+4. What happens when you try to do a histogram for `hospitalmortality`? 
+5. Plot the density of age using the default `bw` setting.  Vary the `bw` parameter, and include when `bw=0.1` and `2` in your report.
+6. Comment briefly on which `bw` setting was the best.
+
+```{r include=FALSE}
+```
+
+********
+
+
+## Scatterplot
+
+So far, all the plots have only considered one variable at a time. Looking at two or more variables at a time can be done through scatter plots.  For instance, the plot below shows the first sodium (x axis) versus the first creatinine (y axis).  Again, the plotting functions have dozens of arguments you can pass, here we pass `xlab` (label of x axis), `ylab` (label of y axis) and `pch`, which controls the type of points the plot uses (in our case 20 is solid points)
+
+```{r echo=TRUE}
+plot(data$NaFirst, 
+     data$CreatinineFirst, 
+     pch=20, 
+     xlab="First Sodium",
+     ylab="First Creatinine")
+```
+
+Including additional variables can be done carefully. For instance, here we plot the same plot but identify those with mortality using the color argument, which we pass the `hospitalmortality` variable.
+
+```{r echo=TRUE}
+plot(data$NaFirst, 
+     data$CreatinineFirst, 
+     pch=20, 
+     col=as.factor(data$hospitalmortality))
+```
+
+
+## Exercise 2: 
+1. Plot minimal GCS (x-axis) vs maximal lactate value (y-axis), and color code those who survived and died using `hospitalmortality`.  The default coding will make dead = red and black = survivors.  Make sure to add an appropriate label for your axes and title. 
+2. Run the `jitter` function on `GCSMin` and `LactateMax`, but NOT `hosp_exp_flg` and replot the data.  Describe what `jitter` does?
+3. Try adding `ylim=c(0, 20)` to your plot function call.  What does this do?
+4. Briefly describe the relationship between minimal GCS, maximal lactate and hospital mortality.
+
+```{r include=FALSE}
+```
+
+********
+
+
+## Boxplot
+
+When trying to compare numeric variables across different levels of a categorical or factor variable, it's often useful to use a boxplot.  The `boxplot` function provides an easy way to do this.  Boxplots use a useful syntax that will later be used in other types of analyses.  Essentially you specify a formula of the form `y~x`, where `y` is what you want on the y axis, and `x` is what you want on the x axis (a categorical variable).  Because we are not prefixing the formula with `data$`, we pass `data=data` to tell the function where to find these variables.  For example, below are two boxplots.  The first plots `LactateMax` by `hospitalmortality`.  Most of the previous arguments for the generic plot functions will work here as well, and we have included x and y axis labels (`xlab` and `ylab`).
+
+```{r}
+boxplot(LactateMax ~ hospitalmortality, 
+        data=data,
+        xlab="Mortality",
+        ylab="Maximal Lactate")
+
+boxplot(MechVentDuration ~ GCSMin, 
+        data=data, 
+        cex.axis=0.6,
+        xlab="Minimal GCS",
+        ylab="Duration of MV")
+```
+
+In the second plot we have plotted `MechVentDuration` by `GCSMin` to illustrate that boxplots can have multiple levels of the variable -- not just binary  We add `cex.axis=0.6` to make the group labels fit on the axis.
+
+## Exercise 3: 
+1. Compute a boxplot for `WeightInitMedian` by `Gender`.  Do men (`Gender == 1`) have higher or lower weight on average?
+2. Apply the `jitter` function to the `WeightInitMedian` variable.  
+
+```{r include=FALSE}
+```
+
+********
+
+
+## Interaction Plot
+
+Interaction plots allow us to visualize when the effect of one categorical variable depends on a second categorical variable. In these plots, parallel lines indicate that there is no interaction; while a greater difference in slope between the lines indicates a higher degree of interaction, either in positive or negative way. These plots are useful for quickly identifying effects, but do not show the corresponding significance of effect. A subsequent ANOVA test can be used to evaluate the statistical significance of any effects that are found. If strong interactions do exist, they must be considered when addressing main effects.
+
+In the following plots we see,
+
+1. An interaction between variables `hospitalmortality` and `MechVentFirst` when considering `TempFirst`, and
+3. very small interaction between variables `hospitalmortality` and `MechVentFirst` when considering `Age`.
+
+
+```{r}
+interaction.plot(data$hospitalmortality,
+                 data$MechVentFirst,
+                 data$TempFirst,
+                 fun = function(x) mean(x, na.rm = TRUE))
+
+interaction.plot(data$hospitalmortality,
+                 data$MechVentFirst,
+                 data$Age,
+                 fun = function(x) mean(x, na.rm = TRUE))
+```
+
+*No exercise for this section.*
+
+********
+
+
+# Supervised Visualizations
+
+Supervised data visualization is often used to explicitly test hypotheses about how data are generated or how they relate. Often this requires plotting several visuals on a single plot. For example, in the case of plotting two Gaussians (obtained with `dnorm`), you can clearly see the separation of means.
+
+```{r}
+x <- seq(0, 10, 0.01)
+plot(x, dnorm(x, 3, 1), type="l")   # mean = 3
+lines(x, dnorm(x, 7, 1), col="red") # mean = 7
+```
+
+
+## Hypothesis Testing
+Hypothesis testing examines the probability that a pattern might have arisen by chance. A statistical hypothesis test assesses the likelihood of the null hypothesis. For example, what is the probability of sampling the observed data assuming the population means are equal? (Null Hypothesis, Alternate Hypothesis) 
+
+In this process, we often compute a test statistic. This is a number that in essence summarizes the difference. The possible values of this statistic come from a known probability distribution. According to this distribution, we determine the probability of seeing a value meeting or exceeding the test statistic, which is called a p-value. For example, $$Z = \frac{\mu_m - \mu_f}{\sqrt{\sigma^2_m / N_m + \sigma^2_f / N_f}}$$.
+
+We also need to choose a threshold at which we consider it safe (or reasonable?) to reject the null hypothesis. If $p < 0.05$, we typically say that the observed effect or difference is statistically significant. This means that there is a less than 5% chance that the observed data is due to chance. Note that the choice of 0.05 is a somewhat arbitrary threshold (chosen by R. A. Fisher).
+
+
+## Common Statistical Methods
+For testing particular relationships, the following tests are often used:
+
+Question | Data Type | Parametric | Non-Parametric
+-------- | --------- | ---------- | --------------
+Do data distributions have different “centers”? | 2 uni. dists | t-Test | Mann-Whitney U 
+ | > 2 uni. dists | ANOVA | Kruskal-Wallis (aka “location” tests) 
+ | > 2 multi. dists | MANOVA | Median Test 
+Are observed counts significantly different? | Counts in categories | | Chi-squared
+Are two vars related? | 2 variables | Pearson coeff. | Rank correl. 
+Do 1 (or more) variables predict another? | Continuous | Linear regression 
+ | Binary | Logistic regression
+ 
+
+## Exercise 4
+1. Count the number of mortality cases in the dataset, and find the mean and standard deviation for the maximal lactate value (`LactateMax`) in each population. 
+2. Plot two Guassian curve representing these two groups on the same (shared) plot.
+3. Compute the test statistic between the two populations. (hint: `t.test` function)
+4. Is the difference in maximal lactate value between different mortality groups (alive/dead) is statistically significant? 
+
+```{r include=FALSE}
+```
+
+********
+
+
+## Prediction / Model-Driven Data Validation
+Another common check during modeling is to examine how well one (or more) data variables predict values of interest. In this setting, we may apply data transformations, check for model predictions, and compute residuals. We first want to propose a model to fit our data, for example age and weight. We can then visualize how well the curve fits the data in three ways.
+
+- Plot a Quantile-Quantile plot to examine the fit of the two variables.
+- Plot a curve to fit the data to show the general fit of the family (model in data space).
+- Plot residual graph (vertical distance from best fit curve) to show accuracy of fit (data in model space).
+
+*No exercise for this section.*
+
+```{r include=FALSE}
+```
+
+********
+
+## Summarization
+Another important use for visualizations is as a first step of summarization. By plotting data relationships, we can examine what parameters best fit our data to a given function, and what is the goodness of fit of that function in general. Visualizations can highlight problems with models, e.g. over and under fitting to a particular trend. For this, we estimate non-parametric regression in R with `lowess` - short for locally weighted scatterplot smoothing. Lowess is a special case of outlier resistant non-parametric regression, where we draw a smooth curve to summarize a relationship between the plotted variables using both a local polynomial least squares fit and an adjusted final fit.
+
+Here we just show an example. We first generate 100 independent Gaussian random variables for x and y with zero mean and unit variance, and visualize them with a scatterplot. Then we generate the lowess fit for the data with a low smoother span (f), and generate the lowess fit for the data with a high smoother span (f). We may see that the parameter of lowess smoothing does matter.
+
+```{r}
+x <- rnorm(100,0,1)
+y <- rnorm(100,0,1)
+
+plot(x, y,
+     main="Model Fit",
+     xlab="Explanatory Variable",
+     ylab="Response Variable")
+
+lines(lowess(x, y, f = 1000),
+      col="blue")
+
+lines(lowess(x, y, f = 0.01),
+      col="red")
+
+legend('topright',
+       c("Oversmoothed = Underfitting", "Undersmoothed = Overfitting"),
+       lty=c(1,1),
+       col=c("blue", "red"))
+```
+
+*No exercise for this section.*
+
+********
+
+
+# Other Considerations
+Subtle choices in the visualization of data can greatly affect interpretation. Aspects such as color, size, spacing, binning, labels, and many others have strong impacts on how we perceive and understand visual information. While these topics are indeed the subject of entire lectures on their own, below are a few considerations.
+
+
+## Improper Graph Choice
+There are some instances where the nature of the data makes a particular graph misleading. For example, we can use the `rpois` function to simulate any number of independent Poisson random variables with parameter $\lambda$. We could then visualize this vector of values, $V$, in several ways to get an estimate of the probability distribution $P(V = v)$.
+
+
+## Scaling and Extraction
+Extraction of a particular span of time in data can be useful when looking for outliers, or investigating a pattern, but these extracted graphs should be representative of the original data. This can be particularity bad when extraction creates truncated axis labels. For example, showing a much smaller portion of the vertical axis can make small differences look big; extracting a smaller portion of the horizontal axis can also make small changes look larger.
+
+
+## Color
+Generally, there are a few good rules of thumb to consider when choosing colors.
+- Use only a few colors ($< 6$ ideally).
+- Colors should be distinctive and clear to all audiences, including the color blind.
+- Strive for color harmony.
+- Use cultural conventions and appreciate symbolism.
+- Get it right in black and white.
+- Take advantage of perceptual color spaces.
+
+
+## Exercise 5
+1. Generate 1000 indepedent Poisson random variables with $\lambda = 1$.
+2. Plot an estimate of the probability distribution $P(V=v)$ using `density`.
+3. Plot an estimate of the probability distribution $P(V=v)$ using `barplot`.
+4. Is the density plot or bar plot more appropriate? Why?
+5. Create a plot from data of your choice that is misleading due to color, scale, or any other means.
+
+```{r include=FALSE}
+```
+
+********
+
