@@ -288,19 +288,19 @@ Interaction plots allow us to visualize when the effect of one categorical varia
 
 In the following plots we see,
 
-1. An interaction between variables `hospitalmortality` and `MechVentFirst` when considering `TempFirst`, and
-3. very small interaction between variables `hospitalmortality` and `MechVentFirst` when considering `Age`.
+1. interaction between variables `Gender` and `MechVentFirst` when considering `SaO2First`, and
+2. interaction between variables `Gender` and `MechVentFirst` when considering `HCO3First`.
 
 
 ```{r}
-interaction.plot(data$hospitalmortality,
+interaction.plot(data$Gender,
                  data$MechVentFirst,
-                 data$TempFirst,
+                 data$SaO2First,
                  fun = function(x) mean(x, na.rm = TRUE))
 
-interaction.plot(data$hospitalmortality,
+interaction.plot(data$Gender,
                  data$MechVentFirst,
-                 data$Age,
+                 data$HCO3First,
                  fun = function(x) mean(x, na.rm = TRUE))
 ```
 
