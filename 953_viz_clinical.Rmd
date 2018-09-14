@@ -45,30 +45,30 @@ Subsequently, this can be loaded into a dataframe called `data`:
 data <- read.csv("https://raw.githubusercontent.com/ckbjimmy/2018_mlw/master/data/PhysionetChallenge2012_data.csv")
 ```
 
-## Local MIMIC-III demo database
+## Local MIMIC-III demo database (skip this part if you use MIMIC-III via Google Cloud)
 
 For people who have already created the MIMIC-III demo data locally and want to use it, we can access it directly from `R` with `RPostgreSQL` package:
 
 ```{r}
-# Create driver and connection, set the correct schema
-
-library(RPostgreSQL)
-# dbConnect can take arguments for dbname, host, port, user, password
-# Please enter your database information here to correctly direct to MIMIC-III demo data
-con <- dbConnect(dbDriver("PostgreSQL"), 
-                 dbname = "mimic",
-                 host = "127.0.0.1", 
-                 port = 5432,
-                 user ="mimic", 
-                 password = "")
-dbExecute(con, "SET search_path TO mimiciii") # you may want to change "mimiciii" to "mimiciii_demo"
-
-# Test connection
-dbExistsTable(con, "patients")
-dbGetQuery(con, "SELECT count(1) FROM patients")
-
-demo.admissions <- dbReadTable(con, "admissions")
-demo.los <- as.numeric(demo.admissions$dischtime - demo.admissions$admittime)
+# # Create driver and connection, set the correct schema
+# 
+# library(RPostgreSQL)
+# # dbConnect can take arguments for dbname, host, port, user, password
+# # Please enter your database information here to correctly direct to MIMIC-III demo data
+# con <- dbConnect(dbDriver("PostgreSQL"), 
+#                  dbname = "mimic",
+#                  host = "127.0.0.1", 
+#                  port = 5432,
+#                  user ="mimic", 
+#                  password = "")
+# dbExecute(con, "SET search_path TO mimiciii") # you may want to change "mimiciii" to "mimiciii_demo"
+# 
+# # Test connection
+# dbExistsTable(con, "patients")
+# dbGetQuery(con, "SELECT count(1) FROM patients")
+# 
+# demo.admissions <- dbReadTable(con, "admissions")
+# demo.los <- as.numeric(demo.admissions$dischtime - demo.admissions$admittime)
 ```
 
 
@@ -91,7 +91,7 @@ If you want to access MIMIC-III demo data through Google Cloud server, please ru
 Please change the `project_id` to your team project ID.  
 For detailed information, please read the [GCP tutorial using R](https://github.com/ckbjimmy/gcp/blob/master/tutorial_R.Rmd).
 
-```{r eval=F}
+```{r}
 # install.packages('devtools')
 # devtools::install_github("rstats-db/bigrquery")
 library(bigrquery)
