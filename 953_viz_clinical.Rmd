@@ -1,7 +1,7 @@
 ---
 title: "Workshop - Data Visualization"
 subtitle: "HST.953 Collaborative Data Science in Medicine"
-author: "Wei-Hung Weng"
+author: "Wei-Hung Weng (ckbjimmy [at] mit [dot] edu)"
 date: "September 14, 2018"
 output: 
   html_document: 
@@ -45,12 +45,14 @@ Subsequently, this can be loaded into a dataframe called `data`:
 data <- read.csv("https://raw.githubusercontent.com/ckbjimmy/2018_mlw/master/data/PhysionetChallenge2012_data.csv")
 ```
 
-For people who want to use MIMIC-III demo data, we can access it directly from `R` with `RPostgreSQL` package:
+## Local MIMIC-III demo database
+
+For people who have already created the MIMIC-III demo data locally and want to use it, we can access it directly from `R` with `RPostgreSQL` package:
 
 ```{r}
 # Create driver and connection, set the correct schema
 
-library("RPostgreSQL")
+library(RPostgreSQL)
 # dbConnect can take arguments for dbname, host, port, user, password
 # Please enter your database information here to correctly direct to MIMIC-III demo data
 con <- dbConnect(dbDriver("PostgreSQL"), 
@@ -64,7 +66,11 @@ dbExecute(con, "SET search_path TO mimiciii") # you may want to change "mimiciii
 # Test connection
 dbExistsTable(con, "patients")
 dbGetQuery(con, "SELECT count(1) FROM patients")
+
+demo.admissions <- dbReadTable(con, "admissions")
+demo.los <- as.numeric(demo.admissions$dischtime - demo.admissions$admittime)
 ```
+
 
 This snippet makes several assumptions with respect to the way the database is set up.
 
@@ -78,6 +84,31 @@ This snippet makes several assumptions with respect to the way the database is s
 ## Exercise 0:
 1. Inspect the PhysioNet dataset you have read in to the dataframe `data`.
 2. Connect to your local Postgres installation from `R` and run a query.
+
+## MIMIC-III demo dataset on Google Cloud
+
+If you want to access MIMIC-III demo data through Google Cloud server, please run the following chunk.
+Please change the `project_id` to your team project ID.  
+For detailed information, please read the [GCP tutorial using R](https://github.com/ckbjimmy/gcp/blob/master/tutorial_R.Rmd).
+
+```{r eval=F}
+# install.packages('devtools')
+# devtools::install_github("rstats-db/bigrquery")
+library(bigrquery)
+
+project_id <- "physionet-data"
+options(httr_oauth_cache=FALSE)
+
+run_query <- function(query){
+  data <- query_exec(query, project=project_id, use_legacy_sql = FALSE)
+  return(data)
+}
+
+run_query(paste0("SELECT count(1) FROM `", project_id, ".mimiciii_demo`.`patients`"))
+
+demo.admissions <- run_query(paste0("SELECT * FROM `", project_id, ".mimiciii_demo`.`admissions`"))
+demo.los <- as.numeric(demo.admissions$DISCHTIME - demo.admissions$ADMITTIME)
+```
 
 ********
 
@@ -132,12 +163,11 @@ hist(log(data$MechVentDuration),
      col="grey")
 ```
 
-Let's also take a look at length of stay in the MIMIC-III demo data.
+Let's also take a look at length of stay in the MIMIC-III demo data. If you use 
 
 ```{r}
-demo.admissions <- dbReadTable(con, "admissions")
-demo.los <- as.numeric(demo.admissions$dischtime - demo.admissions$admittime)
-hist(demo.los,main="Length of Stay in ICU",
+hist(demo.los, 
+     main="Length of Stay in ICU",
      xlab="Length of Stay in ICU",
      col="grey", 
      breaks=50)
