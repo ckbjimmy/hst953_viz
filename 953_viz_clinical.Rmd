@@ -96,7 +96,7 @@ For detailed information, please read the [GCP tutorial using R](https://github.
 # devtools::install_github("rstats-db/bigrquery")
 library(bigrquery)
 
-project_id <- "physionet-data"
+project_id <- "hst-953-2018"
 options(httr_oauth_cache=FALSE)
 
 run_query <- function(query){
@@ -106,7 +106,7 @@ run_query <- function(query){
 
 run_query(paste0("SELECT count(1) FROM `", project_id, ".mimiciii_demo`.`patients`"))
 
-demo.admissions <- run_query(paste0("SELECT * FROM `", project_id, ".mimiciii_demo`.`admissions`"))
+demo.admissions <- run_query(paste0("SELECT * FROM `physionet-data.mimiciii_demo`.`admissions`"))
 demo.los <- as.numeric(demo.admissions$DISCHTIME - demo.admissions$ADMITTIME)
 ```
 
