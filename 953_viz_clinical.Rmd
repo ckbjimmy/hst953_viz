@@ -104,7 +104,7 @@ run_query <- function(query){
   return(data)
 }
 
-run_query(paste0("SELECT count(1) FROM `", project_id, ".mimiciii_demo`.`patients`"))
+run_query(paste0("SELECT count(1) FROM `physionet-data.mimiciii_demo`.`patients`"))
 
 demo.admissions <- run_query(paste0("SELECT * FROM `physionet-data.mimiciii_demo`.`admissions`"))
 demo.los <- as.numeric(demo.admissions$DISCHTIME - demo.admissions$ADMITTIME)
